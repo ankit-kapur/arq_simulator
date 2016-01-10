@@ -59,25 +59,28 @@ class Main:
                 simulator.packet_list.update()
                 simulator.ack_list.update()
 
-            # Fill the background surface
-            simulator.surface.fill(Config.background_color)
+                # Fill the background surface
+                simulator.surface.fill(Config.background_color)
 
-            # Make background image
-            # simulator.blit_background_img_surface()
+                # Make background image
+                # simulator.blit_background_img_surface()
 
-            # Draw all the sprites (the ordering is important)
-            simulator.border_sprite_list.draw(simulator.surface)
-            simulator.transmitter_list.draw(simulator.surface)
-            simulator.receiver_list.draw(simulator.surface)
-            simulator.ack_list.draw(simulator.surface)
-            simulator.packet_list.draw(simulator.surface)
+                # Draw all the sprites (the ordering is important)
+                simulator.border_sprite_list.draw(simulator.surface)
+                simulator.transmitter_list.draw(simulator.surface)
+                simulator.receiver_list.draw(simulator.surface)
+                simulator.ack_list.draw(simulator.surface)
+                simulator.packet_list.draw(simulator.surface)
 
-            # Show text banners
-            # simulator.show_text_banners()
+                # Show text banners
+                # simulator.show_text_banners()
 
-            # Check if the current transmitter got an ACK.
-            # If yes, move on to the next transmitter.
-            simulator.is_transmission_complete()
+                # Check if the current transmitter got an ACK. If yes, move on to the next transmitter.
+                simulator.is_transmission_complete()
+
+            # Check if the simulation is over
+            if simulator.current_position >= num_of_packets:
+                is_simulation_over = True
 
             # FPS
             clock.tick(120)

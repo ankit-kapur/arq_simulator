@@ -3,7 +3,7 @@ import pygame
 # ========= Configurations ========== #
 
 # Rate of packet movement
-rate_of_movement = 1
+rate_of_movement = 20
 
 # Dimensions of packet
 packet_height = 40

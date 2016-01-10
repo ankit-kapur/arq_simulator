@@ -5,15 +5,11 @@ import Components
 import Config
 
 # No. of packets
-num_of_packets = (Config.window_width - Config.wall_padding)/(Config.packet_width + Config.packet_padding)
+num_of_packets = (Config.window_width - Config.wall_padding) / (Config.packet_width + Config.packet_padding)
 
-# Is the simulation over?
+# Global variable
 is_simulation_over = False
 start_new_simulation = False
-
-# Mouse coordinates
-mouse_x = 0
-mouse_y = 0
 mouse_pressed = False
 
 
@@ -43,25 +39,7 @@ class Main:
             # TODO: Move mouse event code to Simulator
             if mouse_pressed:
                 mouse_pressed = False
-                # Get mouse-pointer coordinates
-                mouse_pos = pygame.mouse.get_pos()
-                mouse_x = mouse_pos[0]
-                mouse_y = mouse_pos[1]
-
-                # Did the user ask for the current packet to be destroyed?
-                packet = simulator.packet_map[simulator.current_position]
-                if Utils.is_point_inside_rect(mouse_x, mouse_y, packet.rect):
-                    # packet.reset_packet()
-                    packet.is_moving = False
-                    packet.erase_packet()
-
-                # Did the user ask for the current ACK packet to be destroyed?
-                ack_packet = simulator.ack_map[simulator.current_position]
-                if Utils.is_point_inside_rect(mouse_x, mouse_y, ack_packet.rect):
-                    ack_packet.is_moving = False
-                    # ack_packet.reset_packet()
-                    # ack_packet.transmitter_box.start_transmission()
-                    ack_packet.erase_packet()
+                self.destroy_packet(simulator)
 
             # If user requested for a new simulation, make a new one
             if start_new_simulation:
@@ -80,18 +58,12 @@ class Main:
                 # Fill the background surface
                 simulator.surface.fill(Config.background_color)
 
-                # Make background image
-                # simulator.blit_background_img_surface()
-
                 # Draw all the sprites (the ordering is important)
                 simulator.border_sprite_list.draw(simulator.surface)
                 simulator.transmitter_list.draw(simulator.surface)
                 simulator.receiver_list.draw(simulator.surface)
                 simulator.ack_list.draw(simulator.surface)
                 simulator.packet_list.draw(simulator.surface)
-
-                # Show text banners
-                # simulator.show_text_banners()
 
                 # Check if the current transmitter got an ACK. If yes, move on to the next transmitter.
                 simulator.is_transmission_complete()
@@ -103,16 +75,8 @@ class Main:
             if simulator.current_position >= num_of_packets:
                 is_simulation_over = True
 
-
             # Draw clock ticker
-            clock_x = Config.wall_padding + 10 + (45* simulator.current_position)
-            clock_y = 30
-            start_degree = 0
-            timeout = Config.timeout/Config.rate_of_movement
-            end_degree = 360*simulator.timer/timeout
-            for radius in range(Config.timer_radius - Config.clock_thickness, Config.timer_radius):
-                pygame.gfxdraw.pie(self.surface, clock_x, clock_y, radius, start_degree, end_degree, Config.clock_color)
-
+            self.draw_clock(simulator)
 
             # FPS
             clock.tick(120)
@@ -126,12 +90,36 @@ class Main:
             # Increment the timer
             simulator.timer += Config.timer_increment
 
+    # Draw a pie shape to represent the timer
+    def draw_clock(self, simulator):
+        clock_x = Config.wall_padding + 10 + (45 * simulator.current_position)
+        clock_y = 30
+        start_degree = 0
+        timeout = Config.timeout / Config.rate_of_movement
+        end_degree = 360 * simulator.timer / timeout
+        for radius in range(Config.timer_radius - Config.clock_thickness, Config.timer_radius):
+            pygame.gfxdraw.pie(self.surface, clock_x, clock_y, radius, start_degree, end_degree, Config.clock_color)
 
+    # The user clicked somewhere. Destroy the packet he clicked on (if he did)
+    def destroy_packet(self, simulator):
+        # Get mouse-pointer coordinates
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_x = mouse_pos[0]
+        mouse_y = mouse_pos[1]  # Did the user ask for the current packet to be destroyed?
+        packet = simulator.packet_map[simulator.current_position]
+        if Utils.is_point_inside_rect(mouse_x, mouse_y, packet.rect):
+            # packet.reset_packet()
+            packet.is_moving = False
+            packet.erase_packet()
 
+        # Did the user ask for the current ACK packet to be destroyed?
+        ack_packet = simulator.ack_map[simulator.current_position]
+        if Utils.is_point_inside_rect(mouse_x, mouse_y, ack_packet.rect):
+            ack_packet.is_moving = False
+            ack_packet.erase_packet()
 
 
 class Simulator:
-
     def __init__(self, surface):
         print 'Starting new simulation.'
         global num_of_packets
@@ -217,7 +205,7 @@ class Simulator:
             self.begin_transmission(self.current_position)
 
     def check_for_timeout(self):
-        if self.timer >= Config.timeout/Config.rate_of_movement:
+        if self.timer >= Config.timeout / Config.rate_of_movement:
             # Has timed out
             self.begin_transmission(self.current_position)
 
@@ -227,10 +215,13 @@ class Simulator:
         x_start = 0 + Config.wall_padding
 
         i = 0
-        for x_coord in Utils.frange(x_start, Config.wall_padding + (num_of_packets*Config.packet_width) + (num_of_packets*Config.packet_padding), Config.packet_padding + Config.packet_width):
+        for x_coord in Utils.frange(x_start, Config.wall_padding + (num_of_packets * Config.packet_width) + (
+            num_of_packets * Config.packet_padding), Config.packet_padding + Config.packet_width):
 
             # First make the border for the packet
-            border = Components.Box(x_coord-Config.border_width, y_coord-Config.border_width, Config.packet_width+2*Config.border_width, Config.packet_height+2*Config.border_width, Config.border_color)
+            border = Components.Box(x_coord - Config.border_width, y_coord - Config.border_width,
+                                    Config.packet_width + 2 * Config.border_width,
+                                    Config.packet_height + 2 * Config.border_width, Config.border_color)
             self.border_sprite_list.add(border)
 
             # Make the transmitter box
@@ -250,10 +241,13 @@ class Simulator:
         x_start = 0 + Config.wall_padding
 
         i = 0
-        for x_coord in Utils.frange(x_start, Config.wall_padding + (num_of_packets*Config.packet_width) + (num_of_packets*Config.packet_padding), Config.packet_padding + Config.packet_width):
+        for x_coord in Utils.frange(x_start, Config.wall_padding + (num_of_packets * Config.packet_width) + (
+            num_of_packets * Config.packet_padding), Config.packet_padding + Config.packet_width):
 
             # First make the border for the packet
-            border = Components.Box(x_coord-Config.border_width, y_coord-Config.border_width, Config.packet_width+2*Config.border_width, Config.packet_height+2*Config.border_width, Config.border_color)
+            border = Components.Box(x_coord - Config.border_width, y_coord - Config.border_width,
+                                    Config.packet_width + 2 * Config.border_width,
+                                    Config.packet_height + 2 * Config.border_width, Config.border_color)
             self.border_sprite_list.add(border)
 
             # Make the new receiver box
@@ -266,7 +260,6 @@ class Simulator:
             self.ack_list.add(ack_packet)
             self.ack_map[i] = ack_packet
             i += 1
-
 
     # Handle mouse click and key-press events
     def handle_events(self):

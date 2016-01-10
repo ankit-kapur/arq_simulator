@@ -1,4 +1,5 @@
 import pygame
+import pygame.gfxdraw
 import Utils
 import Components
 import Config
@@ -39,6 +40,7 @@ class Main:
         # The main loop begins
         while not simulator.quit_simulation:
 
+            # TODO: Move mouse event code to Simulator
             if mouse_pressed:
                 mouse_pressed = False
                 # Get mouse-pointer coordinates
@@ -101,6 +103,17 @@ class Main:
             if simulator.current_position >= num_of_packets:
                 is_simulation_over = True
 
+
+            # Draw clock ticker
+            clock_x = Config.wall_padding + 10 + (45* simulator.current_position)
+            clock_y = 30
+            start_degree = 0
+            timeout = Config.timeout/Config.rate_of_movement
+            end_degree = 360*simulator.timer/timeout
+            for radius in range(Config.timer_radius - Config.clock_thickness, Config.timer_radius):
+                pygame.gfxdraw.pie(self.surface, clock_x, clock_y, radius, start_degree, end_degree, Config.clock_color)
+
+
             # FPS
             clock.tick(120)
 
@@ -112,6 +125,8 @@ class Main:
 
             # Increment the timer
             simulator.timer += Config.timer_increment
+
+
 
 
 

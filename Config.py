@@ -3,12 +3,13 @@ import pygame
 # ========= Configurations ========== #
 
 # Rate of packet movement
-rate_of_movement = 2
+rate_of_movement = 1
 
 # Timer config
 timer_increment = 1
 timeout = 800
-
+timer_radius = 18
+clock_thickness = 3
 
 # Dimensions of packet
 packet_height = 40
@@ -27,6 +28,7 @@ packet_padding = 25
 
 # ------- Colors ------- #
 # Background color
+clock_color = (255,255,255)  # WHITE
 background_color = pygame.Color('black')
 transmitter_init_color = (0,135,135)  # AQUA
 transmitter_transmitted_color = (0,0,135)  # BLUE

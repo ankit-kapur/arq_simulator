@@ -1,74 +1,25 @@
 import pygame
 import Utils
-
-
-# ========= Configurations ========== #
-
-# Dimensions of packet
-packet_height = 40
-packet_width = 20
-
-# Window dimensions
-window_width = 870
-window_height = 400
-
-# Border width
-border_width = 2
-
-# Padding
-wall_padding = 40
-packet_padding = 25
+import Components
+import Config
 
 # No. of packets
-num_of_packets = (window_width - wall_padding)/(packet_width + packet_padding)
-
-# ------- Colors ------- #
-# Background color
-background_color = pygame.Color('black')
-transmitter_color = (0,0,135)
-# (135,0,0) # RED
-receiver_color = (0,0,0)
-border_color = (255,255,255)
+num_of_packets = (Config.window_width - Config.wall_padding)/(Config.packet_width + Config.packet_padding)
 
 # Is the simulation over?
 is_simulation_over = False
-new_game = False
+start_new_simulation = False
 
 # Mouse coordinates
 mouse_x = 0
 mouse_y = 0
 mouse_pressed = False
-# ========== End of config ========== #
-
-
-class Interactable(object):
-    def __init__(self, x_pos=None, y_pos=None, height=None, width=None):
-        self.x_pos = x_pos
-        self.y_pos = y_pos
-        self.height = height
-        self.width = width
-
-
-class Packet(pygame.sprite.Sprite):
-    def __init__(self, x, y, w, h, color_of_packet):
-        # Call the parent's constructor
-        pygame.sprite.Sprite.__init__(self)
-
-        # Make a surface for the packet
-        self.image = pygame.Surface([w,h])
-        self.image.fill(color_of_packet)
-
-        # Make our top-left corner the passed-in location.
-        self.rect = self.image.get_rect()
-
-        self.rect.x = x
-        self.rect.y = y
 
 
 class Main:
     def __init__(self):
         global is_simulation_over
-        global new_game
+        global start_new_simulation
         global mouse_x
         global mouse_y
 
@@ -79,56 +30,59 @@ class Main:
         clock = pygame.time.Clock()
 
         # Setup the game-screen
-        screensize = (window_width, window_height)
+        screensize = (Config.window_width, Config.window_height)
         self.surface = pygame.display.set_mode(screensize)
         pygame.display.set_caption("ARQ protocol simulator")
 
         # Make the simulator
         simulator = Simulator(self.surface)
+
         # The main loop begins
-        while not simulator.quit_game:
+        while not simulator.quit_simulation:
 
             # Store mouse-pointer position
             mouse_pos = pygame.mouse.get_pos()
             mouse_x = mouse_pos[0]
             mouse_y = mouse_pos[1]
 
-            # If it's time for a new game, make a new game
-            if new_game:
-                new_game = False
+            # If user requested for a new simulation, make a new one
+            if start_new_simulation:
+                start_new_simulation = False
                 is_simulation_over = False
-                # game = Game(self.surface)
+
+                # Make the simulator
+                simulator = Simulator(self.surface)
 
             # Unless the simulation is over, keep updating all sprites
             if not is_simulation_over:
                 # Update all the sprites
-                simulator.transmitter_list.update()
-                simulator.receiver_list.update()
+                simulator.packet_list.update()
+                simulator.ack_list.update()
 
             # Fill the background surface
-            simulator.surface.fill(background_color)
+            simulator.surface.fill(Config.background_color)
 
             # Make background image
             # simulator.blit_background_img_surface()
 
-            # Check for collisions
-            # simulator.check_for_collisions()
-
-            # Draw all the sprites
+            # Draw all the sprites (the ordering is important)
             simulator.border_sprite_list.draw(simulator.surface)
             simulator.transmitter_list.draw(simulator.surface)
             simulator.receiver_list.draw(simulator.surface)
+            simulator.ack_list.draw(simulator.surface)
+            simulator.packet_list.draw(simulator.surface)
 
             # Show text banners
             # simulator.show_text_banners()
-            #
-            # if is_simulation_over:
-            #     simulator.make_gameover_surface()
+
+            # Check if the current transmitter got an ACK.
+            # If yes, move on to the next transmitter.
+            simulator.is_transmission_complete()
 
             # FPS
             clock.tick(120)
 
-            # Go ahead and update the screen with what we've drawn.
+            # Update the screen with everything we've drawn.
             pygame.display.flip()
 
             # Handle events
@@ -139,45 +93,135 @@ class Main:
 class Simulator:
 
     def __init__(self, surface):
-        global interactables
+        print 'Starting new simulation.'
         global num_of_packets
+
+        # Current transmitter position
+        self.current_position = 0
 
         # Initialize stuff
         self.surface = surface
-        interactables = []
-        self.quit_game = False
+        self.quit_simulation = False
 
+        # These maps all have a numeric key corresponding to the i-th transmitter/receiver/whatever.
+        # We use them so we can look up the i-th component immediately
+        self.transmitter_map = {}
+        self.receiver_map = {}
+        self.packet_map = {}
+        self.ack_map = {}
+
+        # Sprite groups - useful for updating & drawing all the shapes all-at-once as a group
         # List of transmitters (x_pos, y_pos, width, height)
         self.transmitter_list = pygame.sprite.Group()
         # List of receivers (x_pos, y_pos, width, height)
         self.receiver_list = pygame.sprite.Group()
-        # Borders around packets
+        # Packets
+        self.packet_list = pygame.sprite.Group()
+        # ACK Packets
+        self.ack_list = pygame.sprite.Group()
+        # Border boxes around the packets
         self.border_sprite_list = pygame.sprite.Group()
 
         # Make transmitters and receivers
-        self.transmitter_list.add(self.make_packet_wall(0 + wall_padding, transmitter_color))
-        self.receiver_list.add(self.make_packet_wall(window_height - wall_padding - packet_height, receiver_color))
+        self.make_transmitter_boxes()
+        self.make_receiver_boxes()
 
-    # Make the transmitter & receiver packets
-    def make_packet_wall(self, y_coord, color_of_packet):
-        x_start = 0 + wall_padding
-        packet_list_temp = []
+        # Start simulation
+        self.start_simulation()
 
-        for x_coord in Utils.frange(x_start, wall_padding + (num_of_packets*packet_width) + (num_of_packets*packet_padding), packet_padding + packet_width):
+    def start_simulation(self):
+
+        # Begin transmission for the 1st packet
+        self.begin_transmission(i=0)
+
+    # Send the packet at the i-th position
+    def begin_transmission(self, i):
+
+        # Does a transmitter exist at position i?
+        if not self.transmitter_map.has_key(i):
+            return
+
+        # Find the i-th transmitter (by looking it up from the map)
+        current_transmitter = self.transmitter_map[i]
+
+        # ======================== Handshakes ========================
+        # [Let everyone know who their corresponding components are (at this i-th position)]
+
+        # Tell the transmitter box which packet it needs to send
+        self.transmitter_map[i].set_packet(self.packet_map[i])
+
+        # Tell the packet which receiver box it has to travel to
+        self.packet_map[i].set_receiver(self.receiver_map[i])
+
+        # Tell the receiver box know which ack packet corresponds to it.
+        self.receiver_map[i].set_ack_packet(self.ack_map[i])
+
+        # Tell the ack packet which transmitter box it's supposed to return to.
+        self.ack_map[i].set_transmission_box(self.transmitter_map[i])
+
+        # ============ Start transmission for this packet =============
+        current_transmitter.start_transmission()
+
+    # Checks if the current transmitter is done sending it's packet (and has received an ACK for it).
+    # If it's got an ACK, we move on to the next transmitter.
+    def is_transmission_complete(self):
+        if (self.transmitter_map[self.current_position].has_ack_been_received()):
+            # This transmitter got an ACK for it had sent. Move on.
+            self.current_position += 1
+            self.begin_transmission(self.current_position)
+
+
+    # Make the transmitter packet boxes (and their borders)
+    def make_transmitter_boxes(self):
+        y_coord = 0 + Config.wall_padding
+        x_start = 0 + Config.wall_padding
+
+        i = 0
+        for x_coord in Utils.frange(x_start, Config.wall_padding + (num_of_packets*Config.packet_width) + (num_of_packets*Config.packet_padding), Config.packet_padding + Config.packet_width):
 
             # First make the border for the packet
-            border = Packet(x_coord-border_width, y_coord-border_width, packet_width+2*border_width, packet_height+2*border_width, border_color)
+            border = Components.Box(x_coord-Config.border_width, y_coord-Config.border_width, Config.packet_width+2*Config.border_width, Config.packet_height+2*Config.border_width, Config.border_color)
             self.border_sprite_list.add(border)
 
-            # Make the packet
-            new_packet = Packet(x_coord, y_coord, packet_width, packet_height, color_of_packet)
-            packet_list_temp.append(new_packet)
+            # Make the transmitter box
+            new_transbox = Components.TransmitterBox(x_coord, y_coord)
+            self.transmitter_list.add(new_transbox)
+            self.transmitter_map[i] = new_transbox
 
-        return packet_list_temp
+            # Make the packet (with it's coordinates the same as the transmitter box)
+            new_packet = Components.Packet(x_coord, y_coord)
+            self.packet_list.add(new_packet)
+            self.packet_map[i] = new_packet
+            i += 1
+
+    # Make the receiver packet boxes (and their borders)
+    def make_receiver_boxes(self):
+        y_coord = Config.window_height - Config.wall_padding - Config.packet_height
+        x_start = 0 + Config.wall_padding
+
+        i = 0
+        for x_coord in Utils.frange(x_start, Config.wall_padding + (num_of_packets*Config.packet_width) + (num_of_packets*Config.packet_padding), Config.packet_padding + Config.packet_width):
+
+            # First make the border for the packet
+            border = Components.Box(x_coord-Config.border_width, y_coord-Config.border_width, Config.packet_width+2*Config.border_width, Config.packet_height+2*Config.border_width, Config.border_color)
+            self.border_sprite_list.add(border)
+
+            # Make the new receiver box
+            new_recbox = Components.ReceiverBox(x_coord, y_coord)
+            self.receiver_list.add(new_recbox)
+            self.receiver_map[i] = new_recbox
+
+            # Make the ACK packet (with it's coordinates the same as the receiver box)
+            ack_packet = Components.AckPacket(x_coord, y_coord)
+            self.ack_list.add(ack_packet)
+            self.ack_map[i] = ack_packet
+            i += 1
+
 
     # Handle mouse click and key-press events
     def handle_events(self):
         global mousepressed
+        global start_new_simulation
 
         # ----------- Event handlers ------------- #
         events = pygame.event.get()
@@ -189,11 +233,13 @@ class Simulator:
 
             if e.type is pygame.KEYDOWN:
                 if e.key == pygame.K_ESCAPE:
-                    self.quit_game = True
+                    self.quit_simulation = True
+                if e.key == pygame.K_SPACE:
+                    start_new_simulation = True
 
             if e.type is pygame.QUIT:
                 # To quit when the close button is clicked
-                self.quit_game = True
+                self.quit_simulation = True
 
 
 Main()

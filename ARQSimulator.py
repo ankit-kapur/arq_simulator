@@ -20,8 +20,7 @@ class Main:
     def __init__(self):
         global is_simulation_over
         global start_new_simulation
-        global mouse_x
-        global mouse_y
+        global mouse_pressed
 
         # Initialize the pygame library
         pygame.init()
@@ -40,10 +39,27 @@ class Main:
         # The main loop begins
         while not simulator.quit_simulation:
 
-            # Store mouse-pointer position
-            mouse_pos = pygame.mouse.get_pos()
-            mouse_x = mouse_pos[0]
-            mouse_y = mouse_pos[1]
+            if mouse_pressed:
+                mouse_pressed = False
+                # Get mouse-pointer coordinates
+                mouse_pos = pygame.mouse.get_pos()
+                mouse_x = mouse_pos[0]
+                mouse_y = mouse_pos[1]
+
+                # Did the user ask for the current packet to be destroyed?
+                packet = simulator.packet_map[simulator.current_position]
+                if Utils.is_point_inside_rect(mouse_x, mouse_y, packet.rect):
+                    # packet.reset_packet()
+                    packet.is_moving = False
+                    packet.erase_packet()
+
+                # Did the user ask for the current ACK packet to be destroyed?
+                ack_packet = simulator.ack_map[simulator.current_position]
+                if Utils.is_point_inside_rect(mouse_x, mouse_y, ack_packet.rect):
+                    ack_packet.is_moving = False
+                    # ack_packet.reset_packet()
+                    # ack_packet.transmitter_box.start_transmission()
+                    ack_packet.erase_packet()
 
             # If user requested for a new simulation, make a new one
             if start_new_simulation:
@@ -78,6 +94,9 @@ class Main:
                 # Check if the current transmitter got an ACK. If yes, move on to the next transmitter.
                 simulator.is_transmission_complete()
 
+                # Has transmission timed out? Restart it if it has
+                simulator.check_for_timeout()
+
             # Check if the simulation is over
             if simulator.current_position >= num_of_packets:
                 is_simulation_over = True
@@ -91,6 +110,9 @@ class Main:
             # Handle events
             simulator.handle_events()
 
+            # Increment the timer
+            simulator.timer += Config.timer_increment
+
 
 
 class Simulator:
@@ -98,6 +120,9 @@ class Simulator:
     def __init__(self, surface):
         print 'Starting new simulation.'
         global num_of_packets
+
+        # Start timer
+        self.timer = 0
 
         # Current transmitter position
         self.current_position = 0
@@ -140,6 +165,9 @@ class Simulator:
     # Send the packet at the i-th position
     def begin_transmission(self, i):
 
+        # Reset timer to zero
+        self.timer = 0
+
         # Does a transmitter exist at position i?
         if not self.transmitter_map.has_key(i):
             return
@@ -173,6 +201,10 @@ class Simulator:
             self.current_position += 1
             self.begin_transmission(self.current_position)
 
+    def check_for_timeout(self):
+        if self.timer >= Config.timeout/Config.rate_of_movement:
+            # Has timed out
+            self.begin_transmission(self.current_position)
 
     # Make the transmitter packet boxes (and their borders)
     def make_transmitter_boxes(self):
@@ -223,16 +255,16 @@ class Simulator:
 
     # Handle mouse click and key-press events
     def handle_events(self):
-        global mousepressed
+        global mouse_pressed
         global start_new_simulation
 
         # ----------- Event handlers ------------- #
         events = pygame.event.get()
         for e in events:
             if e.type is pygame.MOUSEBUTTONDOWN:
-                mousepressed = True
+                mouse_pressed = True
             elif e.type is pygame.MOUSEBUTTONUP:
-                mousepressed = False
+                mouse_pressed = False
 
             if e.type is pygame.KEYDOWN:
                 if e.key == pygame.K_ESCAPE:

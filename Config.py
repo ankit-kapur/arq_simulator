@@ -3,7 +3,12 @@ import pygame
 # ========= Configurations ========== #
 
 # Rate of packet movement
-rate_of_movement = 20
+rate_of_movement = 2
+
+# Timer config
+timer_increment = 1
+timeout = 800
+
 
 # Dimensions of packet
 packet_height = 40

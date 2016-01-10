@@ -28,6 +28,7 @@ class GenericPacket(Box):
         # Keep record of these initial coordinates. We'll need to them to reset the packet when it's destroyed.
         self.init_x = x
         self.init_y = y
+        self.init_color = packet_color
 
         # Call super constructor
         Box.__init__(self, x, y, Config.packet_width, Config.packet_height, packet_color)
@@ -35,6 +36,7 @@ class GenericPacket(Box):
     def reset_packet(self):
         self.rect.x = self.init_x
         self.rect.y = self.init_y
+        self.image.fill(self.init_color)
 
     def erase_packet(self):
         # Camouflage it into a corner
@@ -68,9 +70,11 @@ class Packet(GenericPacket):
         self.receiver_box = receiver_box
 
     def start_packet_transmission(self):
+        # Restore the packets defaults before starting it's movement
+        self.reset_packet()
+        self.image.fill(Config.packet_color)
         # Start moving
         self.is_moving = True
-        self.image.fill(Config.packet_color)
 
 
 # The packet
@@ -84,6 +88,8 @@ class AckPacket(GenericPacket):
         self.transmitter_box = transmission_box
 
     def start_ack_tranmission(self):
+        # Restore the packets defaults before starting it's movement
+        self.reset_packet()
         # Start moving
         self.is_moving = True
         self.image.fill(Config.ack_packet_color)
